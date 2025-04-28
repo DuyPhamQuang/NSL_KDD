@@ -1,4 +1,4 @@
-# Intrusion Detection on NSL-KDD Dataset using AutoEncoder
+# Network Intrusion Detection on NSL-KDD Dataset using AutoEncoder
 
 ## Task description
 
@@ -11,6 +11,7 @@ Actual Intrusion: 12833, Detected: 11210
 Confusion Matrix:
 
 [[ 8831   880]
+
  [ 2503 10330]]
 
 Precision: 0.9215
