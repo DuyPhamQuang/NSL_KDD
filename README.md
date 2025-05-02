@@ -6,18 +6,20 @@ This project explores the NSL-KDD dataset to build and evaluate an Autoencoder-b
 
 ## Initial Results (Without Hyperparameter Tuning)
 
-Actual Intrusion: 12833, Detected: 11210
+## Summary
+- **Actual Intrusions**: 12,833
+- **Detected Intrusions**: 10,726
 
-Confusion Matrix:
+## Confusion Matrix
+|                | Predicted Positive | Predicted Negative |
+|----------------|--------------------|-------------------|
+| **Actual Positive** | 8,798 (TP)         | 913 (FN)          |
+| **Actual Negative** | 3,020 (FP)         | 9,813 (TN)        |
 
-[[ 8831   880]
+## Performance Metrics
+- **Precision**: 0.9149
+- **Recall**: 0.7647
+- **F1-Score**: 0.8331
+- **ROC AUC**: 0.9165
 
- [ 2503 10330]]
-
-Precision: 0.9215
-
-Recall: 0.8050
-
-F1-Score: 0.8593
-
-ROC AUC: 0.9165
+![alt text](image.png)
