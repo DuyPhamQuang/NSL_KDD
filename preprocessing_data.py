@@ -23,7 +23,7 @@ class DataPreprocessor:
         self.train_data = train_data
         self.test_data = test_data
 
-    def preprocess_datasets(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def preprocess_datasets(self) -> tuple[pd.DataFrame, pd.DataFrame, int]:
         """
         Loads the NSL-KDD dataset, preprocesses it, and returns the preprocessed datasets.
 
@@ -117,7 +117,9 @@ class DataPreprocessor:
         train_data_encoded = pd.concat([self.train_data[numeric_cols_train], encoded_df_train], axis=1)
         test_data_encoded = pd.concat([self.test_data[numeric_cols_test], encoded_df_test], axis=1)
 
-        # Add missing columns and reorder to match training data
+        number_of_features_train = train_data_encoded.shape[1]
+
+        # Add missing columns to test data and reorder to match train data
         train_columns = train_data_encoded.columns
         for col in train_columns:
             if col not in test_data_encoded.columns:
@@ -135,7 +137,7 @@ class DataPreprocessor:
         numeric_cols_test = test_data_encoded.select_dtypes(include=['int64', 'float64']).columns
         test_data_encoded[numeric_cols_test] = scaler.transform(test_data_encoded[numeric_cols_test])
 
-        return train_data_encoded, test_data_encoded
+        return train_data_encoded, test_data_encoded, number_of_features_train
     
 def main():
     # Load datasets
