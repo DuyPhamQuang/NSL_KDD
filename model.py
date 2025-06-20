@@ -10,7 +10,7 @@ class AutoEncoder(nn.Module):
     Decoder: bottleneck_size -> hidden_layer_3 -> hidden_layer_4 -> input_dim
     Hidden layer 1 <-> hidden layer 3, hidden layer 2 <-> hidden layer 4
     """
-    def __init__(self,input_dim, h1, h2, b):
+    def __init__(self, input_dim, h1, h2, b):
         super(AutoEncoder, self).__init__()
         self.input_dim = input_dim
         self.encoder = nn.Sequential(

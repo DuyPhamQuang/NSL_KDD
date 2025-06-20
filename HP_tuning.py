@@ -81,7 +81,7 @@ class HyperparameterTuner:
                 self.optimizer.zero_grad()
 
                 # Forward pass
-                outputs = self.model(inputs)
+                outputs = self.model(targets)
 
                 # Compute loss
                 loss = self.criterion(outputs, targets)
@@ -104,7 +104,7 @@ class HyperparameterTuner:
             with torch.no_grad():   # Disable gradient calculation
                 for data in self.val_loader:
                     inputs, targets = data
-                    outputs = self.model(inputs)
+                    outputs = self.model(targets)
                     loss = self.criterion(outputs, targets)
                     val_loss += loss.item() * inputs.size(0)
 
@@ -176,6 +176,8 @@ class HyperparameterTuner:
             
             # Filter normal data for training
             G_train_normal = G_train[G_train['class'] == 'normal']
+            G_train_normal = G_train_normal.drop('class', axis=1)
+            G_val = G_val.drop('class', axis=1)
             
             # Convert to tensors
             train_tensor = torch.tensor(G_train_normal.values, dtype=torch.float32)
@@ -188,7 +190,7 @@ class HyperparameterTuner:
             val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
             
             # Model
-            model = AutoEncoder(self.input_dim, h1, h2, b)
+            model = AutoEncoder(self.input_dim - 1, h1, h2, b)
             
             # Train with early stopping
             self.train_model(model, train_loader, val_loader, lr)
@@ -213,96 +215,104 @@ class HyperparameterTuner:
         
         return np.mean(auc_scores)
 
-# Tuning Hyperparameters following nested cross-validation strategy
-def tune_hyperparameters(self, train_data: pd.DataFrame) -> optuna.Study:
-    '''
-    Tune hyperparameters using nested cross-validation.
-    train_data : pd.DataFrame
-        The training dataset containing features and labels.
-    '''
-    # Train data
-    self.train_data = train_data
+    # Tuning Hyperparameters following nested cross-validation strategy
+    def tune_hyperparameters(self, train_data: pd.DataFrame) -> None:
+        '''
+        Tune hyperparameters using nested cross-validation.
+        train_data : pd.DataFrame
+            The training dataset containing features and labels.
+        '''
+        # Train data
+        self.train_data = train_data
 
-    # Nested CV
-    k_outer = 5
-    outer_cv = StratifiedKFold(n_splits=k_outer, shuffle=True, random_state=42)
-    outer_metrics = {'auc': [], 'f1': [], 'precision': [], 'recall': []}
+        # Nested CV
+        k_outer = 5
+        outer_cv = StratifiedKFold(n_splits=k_outer, shuffle=True, random_state=42)
+        outer_metrics = {'auc': [], 'f1': [], 'precision': [], 'recall': []}
 
-    for i, (train_idx, test_idx) in enumerate(outer_cv.split(self.train_data, self.train_data['class'])):
-        print(f"\nOuter Fold {i + 1}/{k_outer}")
-        
-        # Split data
-        D_train = train_data.iloc[train_idx]
-        D_val = train_data.iloc[test_idx]
-        labels_train = D_train['class']
-        labels_test = D_val['class']
-        
-        # Optuna study for HP tuning
-        study = optuna.create_study(direction='maximize')
-        study.optimize(lambda trial: self.objective(trial, D_train, labels_train), n_trials=30)
-        
-        # Best hyperparameters
-        best_params = study.best_params
-        print(f"Best HPs for Fold {i + 1}: {best_params}")
-        
-        # Train final model on all normal data in D_train
-        D_train_normal = D_train[D_train['class'] == 'normal']
-        
-        # Convert to tensors
-        train_tensor = torch.tensor(D_train_normal.values, dtype=torch.float32)
-        val_tensor = torch.tensor(D_val.values, dtype=torch.float32)
-        
-        # DataLoaders
-        train_dataset = TensorDataset(train_tensor, train_tensor)
-        val_dataset = TensorDataset(val_tensor, val_tensor)
-        train_loader = DataLoader(train_dataset, batch_size=best_params['batch_size'], shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=best_params['batch_size'], shuffle=False)
-        
-        # Model with best hyperparameters
-        model = AutoEncoder(best_params['h1'], best_params['h2'], best_params['b'])
-        
-        # Train
-        self.train_model(model, train_loader, train_loader, best_params['lr'])
-        
-        # Compute reconstruction errors on training normal data for threshold
-        model.eval()
-        with torch.no_grad():
-            train_errors = []
-            for data in train_loader:
-                inputs, targets = data
-                outputs = model(targets)
-                mse = ((outputs - inputs) ** 2).mean(dim=1)
-                train_errors.extend(mse.numpy())
-        train_errors = np.array(train_errors)
-        threshold = np.mean(train_errors) + 2 * np.std(train_errors)
-        
-        # Compute reconstruction errors on validation set
-        with torch.no_grad():
-            val_errors = []
-            for data in val_loader:
-                inputs, targets = data
-                outputs = model(targets)
-                mse = ((outputs - inputs) ** 2).mean(dim=1)
-                val_errors.extend(mse.numpy())
-        val_errors = np.array(val_errors)
-        
-        # True labels for test set
-        true_labels = (labels_test != 'normal').astype(int)
-        
-        # Predictions based on threshold
-        predictions = (val_errors > threshold).astype(int)
-        
-        # Metrics
-        auc = roc_auc_score(true_labels, val_errors)
-        f1 = f1_score(true_labels, predictions)
-        precision = precision_score(true_labels, predictions)
-        recall = recall_score(true_labels, predictions)
-        
-        outer_metrics['auc'].append(auc)
-        outer_metrics['f1'].append(f1)
-        outer_metrics['precision'].append(precision)
-        outer_metrics['recall'].append(recall)
-        print(f"Fold {i + 1} - AUC: {auc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
+        for i, (train_idx, test_idx) in enumerate(outer_cv.split(self.train_data, self.train_data['class'])):
+            print(f"\nOuter Fold {i + 1}/{k_outer}")
+            
+            # Split data
+            D_train = train_data.iloc[train_idx]
+            D_val = train_data.iloc[test_idx]
+            labels_train = D_train['class']
+            labels_test = D_val['class']
+            
+            # Optuna study for HP tuning
+            STORAGE_PATH = "sqlite:///optuna_studies/study_fold_{fold}.db"
+            study = optuna.create_study(
+                direction='maximize', 
+                storage=STORAGE_PATH.format(fold=i+1), 
+                study_name=f'fold_{i+1}',
+                load_if_exists=True
+            )
+            study.optimize(lambda trial: self.objective(trial, D_train, labels_train), n_trials=30)
+            
+            # Best hyperparameters
+            best_params = study.best_params
+            print(f"Best HPs for Fold {i + 1}: {best_params}")
+            
+            # Train final model on all normal data in D_train
+            D_train_normal = D_train[D_train['class'] == 'normal']
+            D_train_normal = D_train_normal.drop('class', axis=1)
+            D_val = D_val.drop('class', axis=1)
+            
+            # Convert to tensors
+            train_tensor = torch.tensor(D_train_normal.values, dtype=torch.float32)
+            val_tensor = torch.tensor(D_val.values, dtype=torch.float32)
+            
+            # DataLoaders
+            train_dataset = TensorDataset(train_tensor, train_tensor)
+            val_dataset = TensorDataset(val_tensor, val_tensor)
+            train_loader = DataLoader(train_dataset, batch_size=best_params['batch_size'], shuffle=True)
+            val_loader = DataLoader(val_dataset, batch_size=best_params['batch_size'], shuffle=False)
+            
+            # Model with best hyperparameters
+            model = AutoEncoder(self.input_dim - 1, best_params['h1'], best_params['h2'], best_params['b'])
+            
+            # Train
+            self.train_model(model, train_loader, train_loader, best_params['lr'])
+            
+            # Compute reconstruction errors on training normal data for threshold
+            model.eval()
+            with torch.no_grad():
+                train_errors = []
+                for data in train_loader:
+                    inputs, targets = data
+                    outputs = model(targets)
+                    mse = ((outputs - inputs) ** 2).mean(dim=1)
+                    train_errors.extend(mse.numpy())
+            train_errors = np.array(train_errors)
+            threshold = np.mean(train_errors) + 2 * np.std(train_errors)
+            
+            # Compute reconstruction errors on validation set
+            with torch.no_grad():
+                val_errors = []
+                for data in val_loader:
+                    inputs, targets = data
+                    outputs = model(targets)
+                    mse = ((outputs - inputs) ** 2).mean(dim=1)
+                    val_errors.extend(mse.numpy())
+            val_errors = np.array(val_errors)
+            
+            # True labels for test set
+            true_labels = (labels_test != 'normal').astype(int)
+            
+            # Predictions based on threshold
+            predictions = (val_errors > threshold).astype(int)
+            
+            # Metrics
+            auc = roc_auc_score(true_labels, val_errors)
+            f1 = f1_score(true_labels, predictions)
+            precision = precision_score(true_labels, predictions)
+            recall = recall_score(true_labels, predictions)
+            
+            outer_metrics['auc'].append(auc)
+            outer_metrics['f1'].append(f1)
+            outer_metrics['precision'].append(precision)
+            outer_metrics['recall'].append(recall)
+            print(f"Fold {i + 1} - AUC: {auc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
 
 def main() -> None:
     # Load datasets
@@ -311,7 +321,7 @@ def main() -> None:
 
     # Preprocess datasets
     preprocessor = DataPreprocessor(train_data, test_data)
-    train_data_encoded, _, input_dim = preprocessor.preprocess_datasets()
+    train_data_encoded, test_data_encoded, input_dim = preprocessor.preprocess_datasets()
 
     # Initialize hyperparameter tuner
     hyperparameter_tuner = HyperparameterTuner(
@@ -325,3 +335,6 @@ def main() -> None:
 
     # Tune hyperparameters
     hyperparameter_tuner.tune_hyperparameters(train_data_encoded)
+
+if __name__ == "__main__":
+    main()

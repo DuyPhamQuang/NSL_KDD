@@ -91,7 +91,7 @@ class DataPreprocessor:
         categorical_cols = self.train_data.select_dtypes(include=['object']).columns
         categorical_cols_train = [col for col in categorical_cols if col != 'class']  #Exclude class column
 
-        categorical_cols_test = [col for col in categorical_cols if col in self.test_data.columns]
+        categorical_cols_test = [col for col in categorical_cols if col in self.test_data.columns and col != 'class']  # Exclude class column
 
 
         ''' One-hot-Encoding '''
@@ -110,12 +110,12 @@ class DataPreprocessor:
         encoded_df_test = pd.DataFrame(encoded_test_data, columns=encoded_feature_names_test, index=self.test_data.index)
 
         # Combine with numeric features excluding the difficulty level
-        numeric_cols_train = [col for col in self.train_data.columns if col not in categorical_cols_train and col != 'difficulty_level']
+        numeric_cols_train = [col for col in self.train_data.columns if col not in categorical_cols_train and col != 'difficulty_level' and col != 'class']
         numeric_cols_test = [col for col in self.test_data.columns if col not in categorical_cols_test and col != 'class' 
                         and col != 'difficulty_level']
         
-        train_data_encoded = pd.concat([self.train_data[numeric_cols_train], encoded_df_train], axis=1)
-        test_data_encoded = pd.concat([self.test_data[numeric_cols_test], encoded_df_test], axis=1)
+        train_data_encoded = pd.concat([self.train_data[numeric_cols_train], encoded_df_train, self.train_data[['class']]], axis=1)
+        test_data_encoded = pd.concat([self.test_data[numeric_cols_test], encoded_df_test, self.train_data[['class']]], axis=1)
 
         number_of_features_train = train_data_encoded.shape[1]
 
@@ -131,10 +131,8 @@ class DataPreprocessor:
         scaler = MinMaxScaler()
         scaler.fit(train_data_encoded[numeric_cols_train])
 
-        numeric_cols_train = train_data_encoded.select_dtypes(include=['int64', 'float64']).columns
         train_data_encoded[numeric_cols_train] = scaler.transform(train_data_encoded[numeric_cols_train])
 
-        numeric_cols_test = test_data_encoded.select_dtypes(include=['int64', 'float64']).columns
         test_data_encoded[numeric_cols_test] = scaler.transform(test_data_encoded[numeric_cols_test])
 
         return train_data_encoded, test_data_encoded, number_of_features_train
@@ -148,7 +146,7 @@ def main():
     preprocessor = DataPreprocessor(train_data, test_data)
 
     # Preprocess datasets
-    train_data_encoded, test_data_encoded = preprocessor.preprocess_datasets()
+    train_data_encoded, test_data_encoded, input_dim = preprocessor.preprocess_datasets()
 
     print("Preprocessing complete.")
     print(f"Train data shape: {train_data_encoded.shape}")
