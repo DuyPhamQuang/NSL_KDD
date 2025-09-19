@@ -89,7 +89,7 @@ class DataPreprocessor:
 
         # Filter out columns with type object
         categorical_cols = self.train_data.select_dtypes(include=['object']).columns
-        categorical_cols_train = [col for col in categorical_cols if col != 'class']  #Exclude class column
+        categorical_cols_train = [col for col in categorical_cols if col != 'class']  #Exclude class  column
 
         categorical_cols_test = [col for col in categorical_cols if col in self.test_data.columns and col != 'class']  # Exclude class column
 
